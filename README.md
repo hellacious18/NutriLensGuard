@@ -27,6 +27,13 @@ This project is built using a modern, scalable tech stack split into a mobile cl
   - **Clean Swap Agent:** Recommends healthier, natural alternatives.
 - **Data Source:** Google Cloud BigQuery (`nutrilens_db.packaged_foods`), populated from the Indian Packaged Foods Nutritional Dataset 2026 (Kaggle).
 
+## Google Cloud Services Used
+* **Google Cloud BigQuery:** Serves as the primary data warehouse storing our product catalog and nutritional data.
+* **Google AI Studio (Gemini API):** Powers the core Multi-Agent Swarm with the `gemini-3.6-flash` model.
+* **Google Cloud Shell:** Used as the primary development environment and currently hosts our FastAPI backend via tunneling.
+* **Google Cloud Run:** The planned serverless deployment platform for our production FastAPI backend.
+* **Google ML Kit:** Utilized within the Android client for on-device Text Recognition (OCR) of ingredient labels.
+
 ---
 
 ## Setup Instructions
@@ -73,7 +80,19 @@ This project is built using a modern, scalable tech stack split into a mobile cl
 
 This project was conceived and developed as part of Google Cloud's Patchamomma 2026 Hackathon. It perfectly aligns with the requirements by providing an industry-grade, data-driven application utilizing the Google Cloud Tech Stack (BigQuery, Gemini AI, Cloud Run) to solve real-world problems.
 
-## Future Roadmap
-- **Live Camera Integration:** Finalizing CameraX and ML Kit integration for live barcode and text scanning.
-- **Latency Optimization:** Minimizing swarm execution time.
-- **Cloud Run Deployment:** Moving from Cloud Shell tunnels to a permanent, scalable Google Cloud Run deployment.
+## Other Technologies Used
+- **Python 3.12:** Primary backend language.
+- **Uvicorn:** ASGI web server implementation for Python used to run FastAPI.
+- **OkHttp & Gson:** Used in the Android client for network interceptors, timeouts, and JSON serialization.
+- **Pinggy:** Secure SSH reverse proxy used for exposing the local Cloud Shell development environment to the public internet.
+
+## Checklist and Project Timeline
+
+| Status | Phase | Description | Planned Completion Date |
+| :---: | :--- | :--- | :--- |
+| ✅ | **Phase 1: Backend & AI Engine** | Initialize BigQuery dataset, configure Gemini API, and build FastAPI Python server. | Aug 19, 2026 |
+| 🎯 | **Phase 2: Mobile App Foundation** | Build Android UDF Architecture with Jetpack Compose, Retrofit Networking, and Markdown rendering. | Aug 20, 2026 (Checkpoint 1) |
+| ⏳ | **Phase 3: CameraX & ML Kit** | Integrate real-time on-device scanning of physical ingredient labels using CameraX and ML Kit OCR. | Aug 28, 2026 (Checkpoint 2) |
+| ⏳ | **Phase 4: Cloud Run Deployment** | Migrate the FastAPI backend from Cloud Shell tunneling to a scalable, production-ready Google Cloud Run environment. | Sep 2, 2026 |
+| ⏳ | **Phase 5: Polish & Final Testing** | Optimize swarm latency, polish Compose UI animations, error handling, and complete end-to-end testing. | Sep 5, 2026 (Final Checkpoint) |
+| ⏳ | **Submission Lock** | Finalize documentation, record demo video, and submit project. | Sep 7, 2026 |
