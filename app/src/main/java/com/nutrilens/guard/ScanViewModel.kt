@@ -37,6 +37,9 @@ class ScanViewModel : ViewModel() {
             is ScanIntent.OnProductScanned -> triggerAnalysis(intent.productName)
             is ScanIntent.ToggleDiabetic -> _uiState.update { it.copy(isDiabetic = intent.enabled) }
             is ScanIntent.ToggleHypertension -> _uiState.update { it.copy(isHypertension = intent.enabled) }
+            is ScanIntent.TogglePeanutAllergy -> _uiState.update { it.copy(isPeanutAllergy = intent.enabled) }
+            is ScanIntent.ToggleDairyAllergy -> _uiState.update { it.copy(isDairyAllergy = intent.enabled) }
+            is ScanIntent.ToggleGlutenIntolerance -> _uiState.update { it.copy(isGlutenIntolerance = intent.enabled) }
             ScanIntent.ResetScan -> _uiState.update { it.copy(analysisResult = null, errorMessage = null) }
         }
     }
@@ -49,7 +52,10 @@ class ScanViewModel : ViewModel() {
                     ScanApiRequest(
                         product_name = productName,
                         diabetic = _uiState.value.isDiabetic,
-                        hypertension = _uiState.value.isHypertension
+                        hypertension = _uiState.value.isHypertension,
+                        peanut_allergy = _uiState.value.isPeanutAllergy,
+                        dairy_allergy = _uiState.value.isDairyAllergy,
+                        gluten_intolerance = _uiState.value.isGlutenIntolerance
                     )
                 )
                 _uiState.update { it.copy(isLoading = false, analysisResult = response.analysis) }

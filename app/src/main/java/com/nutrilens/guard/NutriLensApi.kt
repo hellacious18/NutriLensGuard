@@ -7,7 +7,10 @@ import retrofit2.http.POST
 data class ScanApiRequest(
     val product_name: String,
     val diabetic: Boolean,
-    val hypertension: Boolean
+    val hypertension: Boolean,
+    val peanut_allergy: Boolean,
+    val dairy_allergy: Boolean,
+    val gluten_intolerance: Boolean
 )
 
 data class ScanApiResponse(

@@ -16,7 +16,7 @@ This project is built using a modern, scalable tech stack split into a mobile cl
 
 ### 2. Backend API (Google Cloud)
 - **Framework:** FastAPI (Python)
-- **Deployment:** Google Cloud Run / Cloud Shell with tunneling (Pinggy/Localtunnel).
+- **Deployment:** Google Cloud Run / Cloud Shell with tunneling (Localtunnel).
 - **Functionality:** Serves the `/api/v1/scan` endpoint which receives user constraints and product text, passing them to the AI Swarm.
 
 ### 3. AI & Data Engine
@@ -53,9 +53,9 @@ This project is built using a modern, scalable tech stack split into a mobile cl
    ```bash
    python3 main.py
    ```
-5. **Tunneling (Pinggy):** Expose your backend to the public internet so your Android emulator/device can reach it:
+5. **Tunneling (Localtunnel):** Expose your backend to the public internet so your Android emulator/device can reach it:
    ```bash
-   ssh -R 80:localhost:8080 a.pinggy.io
+   npx localtunnel --port 8080
    ```
    *Copy the generated HTTPS URL and update your Android project.*
 
@@ -63,10 +63,10 @@ This project is built using a modern, scalable tech stack split into a mobile cl
 
 1. Open the project in **Android Studio**.
 2. Navigate to `ScanViewModel.kt` or your Retrofit configuration.
-3. Update the `baseUrl` with your active Pinggy or Localtunnel URL:
+3. Update the `baseUrl` with your active Localtunnel URL:
    ```kotlin
    private val api = Retrofit.Builder()
-       .baseUrl("https://your-pinggy-url.a.pinggy.online/")
+       .baseUrl("https://your-localtunnel-url.loca.lt/")
        .addConverterFactory(GsonConverterFactory.create())
        .build()
        .create(NutriLensApi::class.java)
@@ -84,7 +84,7 @@ This project was conceived and developed as part of Google Cloud's Patchamomma 2
 - **Python 3.12:** Primary backend language.
 - **Uvicorn:** ASGI web server implementation for Python used to run FastAPI.
 - **OkHttp & Gson:** Used in the Android client for network interceptors, timeouts, and JSON serialization.
-- **Pinggy:** Secure SSH reverse proxy used for exposing the local Cloud Shell development environment to the public internet.
+- **Localtunnel:** Exposes the local Cloud Shell development environment to the public internet so the Android app can communicate with the backend.
 
 ## Checklist and Project Timeline
 

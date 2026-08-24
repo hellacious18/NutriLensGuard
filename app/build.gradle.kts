@@ -81,4 +81,8 @@ dependencies {
     // Networking (Retrofit)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Markdown & Icons
+    implementation("com.github.jeziellago:compose-markdown:0.5.2")
+    implementation("androidx.compose.material:material-icons-extended")
 }
