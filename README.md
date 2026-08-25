@@ -36,43 +36,111 @@ This project is built using a modern, scalable tech stack split into a mobile cl
 
 ---
 
-## Setup Instructions
+## Setup & Execution Guide
 
-### 1. Backend Setup (FastAPI & BigQuery)
+### 1. Environment & Backend Setup
 
-1. Open **Google Cloud Shell** and clone your backend repository.
-2. Ensure you have your Gemini API key set:
+1. **Navigate to the backend directory and activate the virtual environment:**
    ```bash
-   export GEMINI_API_KEY="your_api_key_here"
+   cd nutrilens-backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
    ```
-3. Install dependencies:
-   ```bash
-   pip install fastapi uvicorn google-cloud-bigquery google-genai
-   ```
-4. Start the FastAPI server:
-   ```bash
-   python3 main.py
-   ```
-5. **Tunneling (Localtunnel):** Expose your backend to the public internet so your Android emulator/device can reach it:
-   ```bash
-   npx localtunnel --port 8080
-   ```
-   *Copy the generated HTTPS URL and update your Android project.*
 
-### 2. Android App Setup
-
-1. Open the project in **Android Studio**.
-2. Navigate to `ScanViewModel.kt` or your Retrofit configuration.
-3. Update the `baseUrl` with your active Localtunnel URL:
-   ```kotlin
-   private val api = Retrofit.Builder()
-       .baseUrl("https://your-localtunnel-url.loca.lt/")
-       .addConverterFactory(GsonConverterFactory.create())
-       .build()
-       .create(NutriLensApi::class.java)
+2. **Configure your Gemini API Key in `.env`:**
+   ```bash
+   # In nutrilens-backend/.env
+   GEMINI_API_KEY="your_api_key_here"
+   MODEL="gemini-3.5-flash-lite"
    ```
-4. Sync Gradle to ensure all dependencies (Retrofit, CameraX, Compose Markdown) are downloaded.
-5. Build and run the app on an Android Emulator or physical device.
+
+---
+
+### 2. Running the Servers
+
+You can run the ADK Web UI for interactive debugging, the FastAPI server for mobile app requests, or both simultaneously:
+
+#### A. Run Google ADK Web UI (Visual Multi-Agent Dashboard)
+Provides an interactive visual agent graph, live trace inspector, and chat playground:
+```bash
+cd nutrilens-backend
+source venv/bin/activate
+adk web . --port 8000
+```
+👉 Access the Web UI in your browser at: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
+
+#### B. Run the FastAPI Backend (For Mobile App API)
+Serves the `/api/v1/scan` multi-agent endpoint consumed by the Android client:
+```bash
+cd nutrilens-backend
+source venv/bin/activate
+python main.py
+```
+👉 Server listens on: **`http://localhost:8080`**
+
+---
+
+### 3. Connecting the Android Mobile App
+
+Update `local.properties` in the project root according to your testing setup:
+
+* **Physical Android Device via USB (Recommended):**
+  1. Forward device ports over USB:
+     ```bash
+     adb reverse tcp:8080 tcp:8080
+     ```
+  2. Set `local.properties`:
+     ```properties
+     BASE_URL="http://localhost:8080/"
+     ```
+
+* **Android Studio Virtual Emulator (AVD):**
+  Set `local.properties`:
+  ```properties
+  BASE_URL="http://10.0.2.2:8080/"
+  ```
+
+* **Public Tunneling (Localtunnel / Cloud Shell):**
+  1. Expose port 8080:
+     ```bash
+     npx localtunnel --port 8080
+     ```
+  2. Set `local.properties`:
+     ```properties
+     BASE_URL="https://your-localtunnel-url.loca.lt/"
+     ```
+
+Then build and run the app from Android Studio or terminal:
+```bash
+./gradlew installDebug
+```
+
+---
+
+### 4. How to Stop / Kill the Servers
+
+If a port is already in use (`[Errno 48] Address already in use`) or you need to terminate running background processes:
+
+* **Kill ADK Web Server (Port 8000):**
+  ```bash
+  lsof -ti :8000 | xargs kill -9
+  ```
+
+* **Kill FastAPI Backend Server (Port 8080):**
+  ```bash
+  lsof -ti :8080 | xargs kill -9
+  ```
+
+* **Kill Both Servers at Once:**
+  ```bash
+  lsof -ti :8000,8080 | xargs kill -9
+  ```
+
+* **Clear ADB Port Forwards:**
+  ```bash
+  adb reverse --remove-all
+  ```
 
 ---
 
