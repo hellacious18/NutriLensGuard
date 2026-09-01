@@ -3,6 +3,9 @@
 
     <!-- Enable Network Access for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Camera permission for CameraX OCR scanning -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="true"

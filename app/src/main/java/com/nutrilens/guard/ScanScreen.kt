@@ -1,6 +1,9 @@
 package com.nutrilens.guard
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -20,9 +23,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
@@ -46,6 +52,25 @@ fun ScanScreen(viewModel: ScanViewModel) {
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            Toast.makeText(context, "Scanning photo with on-device AI...", Toast.LENGTH_SHORT).show()
+            FoodOcrAnalyzer.analyzeImageUri(
+                context = context,
+                uri = uri,
+                onSuccess = { fullText, title ->
+                    viewModel.processIntent(ScanIntent.AnalyzeExtractedText(text = fullText, title = title))
+                },
+                onError = { e ->
+                    Toast.makeText(context, "Failed to analyze photo: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
 
     val activeProfileCount = listOf(
         state.isDiabetic,
@@ -61,124 +86,151 @@ fun ScanScreen(viewModel: ScanViewModel) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.HealthAndSafety,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                "NutriLens Guard",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                "Food Safety & Health AI",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    BadgedBox(
-                        badge = {
-                            if (activeProfileCount > 0) {
-                                Badge { Text("$activeProfileCount") }
-                            }
-                        }
-                    ) {
-                        IconButton(onClick = { viewModel.processIntent(ScanIntent.ToggleProfileExpanded()) }) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "Dietary Profile Settings",
-                                tint = if (state.isProfileExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                    IconButton(onClick = { viewModel.processIntent(ScanIntent.ClearChat) }) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Clear Chat History"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
+    if (state.showCameraScanner) {
+        CameraScannerView(
+            onDismiss = { viewModel.processIntent(ScanIntent.ToggleCameraScanner(false)) },
+            onScanned = { candidateTitle, fullText ->
+                viewModel.processIntent(ScanIntent.AnalyzeExtractedText(text = fullText, title = candidateTitle))
+            }
+        )
+    } else {
+        if (state.showLinkDialog) {
+            ProductLinkDialog(
+                onDismiss = { viewModel.processIntent(ScanIntent.ToggleLinkDialog(false)) },
+                onSubmitLink = { url ->
+                    viewModel.processIntent(ScanIntent.AnalyzeLink(url))
+                }
             )
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .imePadding()
-        ) {
-            // Collapsible Dietary Profile Section
-            AnimatedVisibility(
-                visible = state.isProfileExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                DietaryProfilesCard(
-                    state = state,
-                    onToggleDiabetic = { viewModel.processIntent(ScanIntent.ToggleDiabetic(it)) },
-                    onToggleHypertension = { viewModel.processIntent(ScanIntent.ToggleHypertension(it)) },
-                    onTogglePeanut = { viewModel.processIntent(ScanIntent.TogglePeanutAllergy(it)) },
-                    onToggleDairy = { viewModel.processIntent(ScanIntent.ToggleDairyAllergy(it)) },
-                    onToggleGluten = { viewModel.processIntent(ScanIntent.ToggleGlutenIntolerance(it)) }
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.HealthAndSafety,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "NutriLens Guard",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    "Food Safety & Health AI",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        BadgedBox(
+                            badge = {
+                                if (activeProfileCount > 0) {
+                                    Badge { Text("$activeProfileCount") }
+                                }
+                            }
+                        ) {
+                            IconButton(onClick = { viewModel.processIntent(ScanIntent.ToggleProfileExpanded()) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Dietary Profile Settings",
+                                    tint = if (state.isProfileExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        IconButton(onClick = { viewModel.processIntent(ScanIntent.ClearChat) }) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Clear Chat History"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
                 )
             }
-
-            // Chat Messages List
-            LazyColumn(
-                state = listState,
+        ) { paddingValues ->
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .imePadding()
             ) {
-                items(state.messages, key = { it.id }) { message ->
-                    ChatMessageBubble(message = message)
+                // Collapsible Dietary Profile Section
+                AnimatedVisibility(
+                    visible = state.isProfileExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    DietaryProfilesCard(
+                        state = state,
+                        onToggleDiabetic = { viewModel.processIntent(ScanIntent.ToggleDiabetic(it)) },
+                        onToggleHypertension = { viewModel.processIntent(ScanIntent.ToggleHypertension(it)) },
+                        onTogglePeanut = { viewModel.processIntent(ScanIntent.TogglePeanutAllergy(it)) },
+                        onToggleDairy = { viewModel.processIntent(ScanIntent.ToggleDairyAllergy(it)) },
+                        onToggleGluten = { viewModel.processIntent(ScanIntent.ToggleGlutenIntolerance(it)) }
+                    )
                 }
 
-                if (state.isLoading) {
-                    item(key = "loading_indicator") {
-                        LoadingMessageBubble()
+                // Chat Messages List
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    items(state.messages, key = { it.id }) { message ->
+                        ChatMessageBubble(message = message)
+                    }
+
+                    if (state.isLoading) {
+                        item(key = "loading_indicator") {
+                            LoadingMessageBubble()
+                        }
                     }
                 }
+
+                // Quick Suggestions Chips Row
+                QuickSuggestionsRow(
+                    onSuggestionClick = { product ->
+                        viewModel.processIntent(ScanIntent.SendMessage(product))
+                    },
+                    enabled = !state.isLoading
+                )
+
+                // Chat Input Bar with Camera, Photo, and Link Actions
+                ChatInputBar(
+                    text = state.inputText,
+                    onTextChange = { viewModel.processIntent(ScanIntent.UpdateInputText(it)) },
+                    onSendMessage = {
+                        if (state.inputText.isNotBlank()) {
+                            viewModel.processIntent(ScanIntent.SendMessage(state.inputText))
+                            keyboardController?.hide()
+                        }
+                    },
+                    onCameraClick = {
+                        viewModel.processIntent(ScanIntent.ToggleCameraScanner(true))
+                    },
+                    onPhotoClick = {
+                        galleryLauncher.launch("image/*")
+                    },
+                    onLinkClick = {
+                        viewModel.processIntent(ScanIntent.ToggleLinkDialog(true))
+                    },
+                    isLoading = state.isLoading
+                )
             }
-
-            // Quick Suggestions Chips Row
-            QuickSuggestionsRow(
-                onSuggestionClick = { product ->
-                    viewModel.processIntent(ScanIntent.SendMessage(product))
-                },
-                enabled = !state.isLoading
-            )
-
-            // Chat Input Bar
-            ChatInputBar(
-                text = state.inputText,
-                onTextChange = { viewModel.processIntent(ScanIntent.UpdateInputText(it)) },
-                onSendMessage = {
-                    if (state.inputText.isNotBlank()) {
-                        viewModel.processIntent(ScanIntent.SendMessage(state.inputText))
-                        keyboardController?.hide()
-                    }
-                },
-                isLoading = state.isLoading
-            )
         }
     }
 }
@@ -424,6 +476,9 @@ private fun ChatInputBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
+    onCameraClick: () -> Unit,
+    onPhotoClick: () -> Unit,
+    onLinkClick: () -> Unit,
     isLoading: Boolean
 ) {
     Surface(
@@ -433,9 +488,47 @@ private fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = onCameraClick,
+                enabled = !isLoading,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = "Scan Packaging with Camera",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(
+                onClick = onPhotoClick,
+                enabled = !isLoading,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Image,
+                    contentDescription = "Upload Food Photo",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(
+                onClick = onLinkClick,
+                enabled = !isLoading,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Link,
+                    contentDescription = "Paste Product Link",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(2.dp))
+
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
@@ -444,8 +537,9 @@ private fun ChatInputBar(
                     .clip(RoundedCornerShape(24.dp)),
                 placeholder = {
                     Text(
-                        "Enter product name or ingredients...",
-                        style = MaterialTheme.typography.bodyMedium
+                        "Product or ingredients...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1
                     )
                 },
                 shape = RoundedCornerShape(24.dp),
@@ -458,13 +552,13 @@ private fun ChatInputBar(
                 )
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
             FilledIconButton(
                 onClick = onSendMessage,
                 enabled = text.isNotBlank() && !isLoading,
                 shape = CircleShape,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
