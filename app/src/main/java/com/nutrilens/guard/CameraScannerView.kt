@@ -35,11 +35,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import java.io.File
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScannerView(
     onDismiss: () -> Unit,
-    onScanned: (candidateTitle: String, fullText: String) -> Unit
+    onScanned: (candidateTitle: String, fullText: String, imageUri: String?) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -70,6 +74,11 @@ fun CameraScannerView(
     var isFlashOn by remember { mutableStateOf(false) }
     var cameraSelector by remember { mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA) }
     var cameraInstance by remember { mutableStateOf<Camera?>(null) }
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .build()
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -115,7 +124,8 @@ fun CameraScannerView(
                                     lifecycleOwner,
                                     cameraSelector,
                                     preview,
-                                    imageAnalysis
+                                    imageAnalysis,
+                                    imageCapture
                                 )
                                 cameraInstance = cam
                             } catch (exc: Exception) {
@@ -257,7 +267,21 @@ fun CameraScannerView(
                     Button(
                         onClick = {
                             if (detectedTitle.isNotBlank() || detectedFullText.isNotBlank()) {
-                                onScanned(detectedTitle, detectedFullText)
+                                val photoFile = File(context.cacheDir, "scan_${System.currentTimeMillis()}.jpg")
+                                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                                imageCapture.takePicture(
+                                    outputOptions,
+                                    ContextCompat.getMainExecutor(context),
+                                    object : ImageCapture.OnImageSavedCallback {
+                                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                            onScanned(detectedTitle, detectedFullText, photoFile.absolutePath)
+                                        }
+
+                                        override fun onError(exception: ImageCaptureException) {
+                                            onScanned(detectedTitle, detectedFullText, null)
+                                        }
+                                    }
+                                )
                             } else {
                                 Toast.makeText(context, "Scanning packaging... Hold steady", Toast.LENGTH_SHORT).show()
                             }

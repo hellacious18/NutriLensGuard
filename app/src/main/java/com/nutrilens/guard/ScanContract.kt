@@ -6,7 +6,11 @@ sealed interface ScanIntent {
     data class SendMessage(val message: String) : ScanIntent
     data class UpdateInputText(val text: String) : ScanIntent
     data class OnProductScanned(val productName: String) : ScanIntent
-    data class AnalyzeExtractedText(val text: String, val title: String? = null) : ScanIntent
+    data class AnalyzeExtractedText(
+        val text: String,
+        val title: String? = null,
+        val imageUri: String? = null
+    ) : ScanIntent
     data class AnalyzeLink(val url: String) : ScanIntent
     data class ToggleCameraScanner(val show: Boolean) : ScanIntent
     data class ToggleLinkDialog(val show: Boolean) : ScanIntent
@@ -24,6 +28,8 @@ data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
+    val imageUri: String? = null,
+    val linkUrl: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val isError: Boolean = false
 )

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,12 +23,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Tune
@@ -36,14 +39,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import dev.jeziellago.compose.markdowntext.MarkdownText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,7 +70,13 @@ fun ScanScreen(viewModel: ScanViewModel) {
                 context = context,
                 uri = uri,
                 onSuccess = { fullText, title ->
-                    viewModel.processIntent(ScanIntent.AnalyzeExtractedText(text = fullText, title = title))
+                    viewModel.processIntent(
+                        ScanIntent.AnalyzeExtractedText(
+                            text = fullText,
+                            title = title,
+                            imageUri = uri.toString()
+                        )
+                    )
                 },
                 onError = { e ->
                     Toast.makeText(context, "Failed to analyze photo: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
@@ -89,8 +102,14 @@ fun ScanScreen(viewModel: ScanViewModel) {
     if (state.showCameraScanner) {
         CameraScannerView(
             onDismiss = { viewModel.processIntent(ScanIntent.ToggleCameraScanner(false)) },
-            onScanned = { candidateTitle, fullText ->
-                viewModel.processIntent(ScanIntent.AnalyzeExtractedText(text = fullText, title = candidateTitle))
+            onScanned = { candidateTitle, fullText, imageUri ->
+                viewModel.processIntent(
+                    ScanIntent.AnalyzeExtractedText(
+                        text = fullText,
+                        title = candidateTitle,
+                        imageUri = imageUri
+                    )
+                )
             }
         )
     } else {
@@ -295,10 +314,128 @@ private fun DietaryProfilesCard(
     }
 }
 
+private fun extractDomain(url: String): String {
+    return try {
+        val uri = java.net.URI(if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url")
+        val host = uri.host ?: url
+        host.removePrefix("www.")
+    } catch (e: Exception) {
+        "Website"
+    }
+}
+
+private fun extractLinkTitle(url: String): String {
+    return try {
+        val path = java.net.URI(if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url").path
+        val lastSegment = path.split("/").filter { it.isNotBlank() }.lastOrNull()
+        if (!lastSegment.isNullOrBlank() && lastSegment.length > 2) {
+            lastSegment.replace("-", " ").replace("_", " ").replace("+", " ")
+                .split(" ")
+                .joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
+        } else {
+            url
+        }
+    } catch (e: Exception) {
+        url
+    }
+}
+
+private fun isDirectImageUrl(url: String): Boolean {
+    val lower = url.lowercase().substringBefore("?")
+    return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp") || lower.endsWith(".gif")
+}
+
+@Composable
+private fun LinkPreviewBubble(
+    url: String,
+    onOpenLink: () -> Unit
+) {
+    val context = LocalContext.current
+    val domain = remember(url) { extractDomain(url) }
+    val title = remember(url) { extractLinkTitle(url) }
+    val isImage = remember(url) { isDirectImageUrl(url) }
+
+    Surface(
+        shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        tonalElevation = 2.dp,
+        modifier = Modifier
+            .widthIn(max = 240.dp)
+            .clip(RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp))
+            .clickable { onOpenLink() }
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            if (isImage) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Link Image Preview",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = domain,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = "Open Link",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = url,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                fontSize = 10.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChatMessageBubble(message: ChatMessage) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -346,28 +483,77 @@ private fun ChatMessageBubble(message: ChatMessage) {
             }
         }
 
-        Surface(
-            shape = if (message.isUser) {
-                RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
-            } else {
-                RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
-            },
-            color = when {
-                message.isUser -> MaterialTheme.colorScheme.primary
-                message.isError -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            },
-            tonalElevation = if (message.isUser) 0.dp else 1.dp,
-            modifier = Modifier.widthIn(max = 340.dp)
-        ) {
-            Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                if (message.isUser) {
-                    Text(
-                        text = message.text,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.bodyMedium
+        if (message.isUser) {
+            val detectedLink = message.linkUrl ?: if (message.text.trim().startsWith("http://") || message.text.trim().startsWith("https://")) message.text.trim() else null
+
+            when {
+                // If images are sent, just show image for user's messages 200x200 ratio of image, center cropped
+                message.imageUri != null -> {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        tonalElevation = 2.dp,
+                        modifier = Modifier.widthIn(max = 220.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(6.dp)) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(message.imageUri)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Scanned Food Packaging",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(200.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        }
+                    }
+                }
+
+                // If link is sent, show preview of the link / image
+                detectedLink != null -> {
+                    LinkPreviewBubble(
+                        url = detectedLink,
+                        onOpenLink = {
+                            try {
+                                val fullUrl = if (detectedLink.startsWith("http://") || detectedLink.startsWith("https://")) detectedLink else "https://$detectedLink"
+                                uriHandler.openUri(fullUrl)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open link", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
-                } else {
+                }
+
+                // Standard Text Message
+                else -> {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.widthIn(max = 340.dp)
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            Text(
+                                text = message.text,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // AI Response Bubble
+            Surface(
+                shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp),
+                color = if (message.isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 1.dp,
+                modifier = Modifier.widthIn(max = 340.dp)
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     SelectionContainer {
                         MarkdownText(
                             markdown = message.text,

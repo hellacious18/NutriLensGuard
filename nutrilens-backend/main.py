@@ -7,11 +7,15 @@ from google.genai import types
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from nutrilens_swarm.agent import app as adk_app
+from database import init_db, get_cached_analysis, save_analysis, get_connection
+
+# Initialize SQLite Database Table & Indexes
+init_db()
 
 app = FastAPI(
     title="NutriLens Guard API",
-    description="Backend API powered by Google Agent Development Kit (ADK) Multi-Agent Swarm",
-    version="2.0.0"
+    description="Backend API powered by Google Agent Development Kit (ADK) Multi-Agent Swarm with SQLite Response Cache",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -38,7 +42,29 @@ class ScanRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "system": "NutriLens Guard ADK Multi-Agent Engine"}
+    return {
+        "status": "online",
+        "system": "NutriLens Guard ADK Multi-Agent Engine",
+        "cache": "SQLite Active"
+    }
+
+
+@app.get("/api/v1/cache/stats")
+def get_cache_stats():
+    """Returns total cached products and top queried items"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as total_cached, SUM(hit_count) as total_hits FROM product_scans")
+        summary = cursor.fetchone()
+        
+        cursor.execute("SELECT product_name, brand, hit_count, updated_at FROM product_scans ORDER BY hit_count DESC LIMIT 10")
+        top_products = [dict(row) for row in cursor.fetchall()]
+        
+        return {
+            "total_cached_products": summary["total_cached"] or 0,
+            "total_cache_hits": summary["total_hits"] or 0,
+            "popular_products": top_products
+        }
 
 
 @app.post("/api/v1/scan")
@@ -50,6 +76,14 @@ async def analyze_product(request: ScanRequest):
         "dairy_allergy": request.dairy_allergy,
         "gluten_intolerance": request.gluten_intolerance
     }
+
+    # 1. Check SQLite Database Cache First (Fast Path: < 20ms)
+    cached_result = get_cached_analysis(request.product_name, health_profile)
+    if cached_result:
+        print(f"⚡ [CACHE HIT] Found '{request.product_name}' in SQLite (Total hits: {cached_result['hit_count']})")
+        return cached_result
+
+    print(f"🔍 [CACHE MISS] '{request.product_name}' not in SQLite. Invoking ADK Swarm...")
 
     user_id = f"user_{uuid.uuid4().hex[:8]}"
 
@@ -112,8 +146,7 @@ async def analyze_product(request: ScanRequest):
 {swaps}
 """
 
-        # Return both the combined `analysis` and granular fields
-        return {
+        response_data = {
             "query": request.product_name,
             "analysis": analysis_markdown.strip(),
             "product_name": product_name,
@@ -121,8 +154,16 @@ async def analyze_product(request: ScanRequest):
             "health_profile": health_profile,
             "deception_report": deception,
             "health_risks": health_risks,
-            "swap_recommendations": swaps
+            "swap_recommendations": swaps,
+            "cached": False,
+            "hit_count": 1
         }
+
+        # 2. Persist result in SQLite Database for future queries
+        save_analysis(request.product_name, health_profile, response_data)
+        print(f"💾 [SAVED TO DB] Cached '{product_name}' into SQLite database.")
+
+        return response_data
 
     except Exception as e:
         print("\n❌ BACKEND EXCEPTION ENCOUNTERED:")

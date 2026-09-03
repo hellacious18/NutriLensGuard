@@ -35,7 +35,7 @@ class ScanViewModel : ViewModel() {
             is ScanIntent.SendMessage -> sendMessage(intent.message)
             is ScanIntent.UpdateInputText -> _uiState.update { it.copy(inputText = intent.text) }
             is ScanIntent.OnProductScanned -> sendMessage(intent.productName)
-            is ScanIntent.AnalyzeExtractedText -> analyzeScannedOcr(intent.text, intent.title)
+            is ScanIntent.AnalyzeExtractedText -> analyzeScannedOcr(intent.text, intent.title, intent.imageUri)
             is ScanIntent.AnalyzeLink -> analyzeLink(intent.url)
             is ScanIntent.ToggleCameraScanner -> _uiState.update { it.copy(showCameraScanner = intent.show) }
             is ScanIntent.ToggleLinkDialog -> _uiState.update { it.copy(showLinkDialog = intent.show) }
@@ -63,36 +63,47 @@ class ScanViewModel : ViewModel() {
         }
     }
 
-    private fun analyzeScannedOcr(rawText: String, title: String?) {
-        val cleanTitle = title?.takeIf { it.isNotBlank() } ?: "Scanned Product"
-        val displayText = buildString {
-            append("📸 **Scanned Food Package:** $cleanTitle\n\n")
-            if (rawText.isNotBlank()) {
-                val preview = if (rawText.length > 250) "${rawText.take(250)}..." else rawText
-                append("*Extracted Packaging Text:*\n```\n$preview\n```")
-            }
+    private fun analyzeScannedOcr(rawText: String, title: String?, imageUri: String?) {
+        val cleanTitle = title?.takeIf { it.isNotBlank() } ?: "Scanned Food Item"
+        val displayText = if (rawText.isNotBlank()) {
+            val preview = if (rawText.length > 250) "${rawText.take(250)}..." else rawText
+            "📸 **$cleanTitle**\n\n*Extracted Text:*\n```\n$preview\n```"
+        } else {
+            "📸 **$cleanTitle**"
         }
         val apiQuery = if (rawText.isNotBlank()) "$cleanTitle\nIngredients/Text: $rawText" else cleanTitle
-        sendQuery(displayText = displayText, apiQuery = apiQuery)
+        sendQuery(displayText = displayText, apiQuery = apiQuery, imageUri = imageUri)
     }
 
     private fun analyzeLink(url: String) {
         val trimmed = url.trim()
         if (trimmed.isBlank()) return
-        val displayText = "🔗 **Analyzing Food Product Link:**\n$trimmed"
-        sendQuery(displayText = displayText, apiQuery = trimmed)
+        val displayText = "🔗 $trimmed"
+        sendQuery(displayText = displayText, apiQuery = trimmed, linkUrl = trimmed)
     }
 
     private fun sendMessage(query: String) {
         val trimmed = query.trim()
         if (trimmed.isBlank()) return
-        sendQuery(displayText = trimmed, apiQuery = trimmed)
+        val isLink = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+        val linkUrl = if (isLink) trimmed else null
+        sendQuery(displayText = trimmed, apiQuery = trimmed, linkUrl = linkUrl)
     }
 
-    private fun sendQuery(displayText: String, apiQuery: String) {
+    private fun sendQuery(
+        displayText: String,
+        apiQuery: String,
+        imageUri: String? = null,
+        linkUrl: String? = null
+    ) {
         if (_uiState.value.isLoading) return
 
-        val userMessage = ChatMessage(text = displayText, isUser = true)
+        val userMessage = ChatMessage(
+            text = displayText,
+            isUser = true,
+            imageUri = imageUri,
+            linkUrl = linkUrl
+        )
         _uiState.update { state ->
             state.copy(
                 messages = state.messages + userMessage,

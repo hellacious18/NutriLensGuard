@@ -85,4 +85,7 @@ dependencies {
     // Markdown & Icons
     implementation("com.github.jeziellago:compose-markdown:0.5.2")
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Coil for Jetpack Compose image loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }
